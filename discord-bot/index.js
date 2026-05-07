@@ -268,14 +268,18 @@ client.on('messageCreate', async (message) => {
   if (message.content === '!setup-gvg-reminder' && isAdminOrOwner(message.member, message.author.id)) {
     const embed = new EmbedBuilder()
       .setTitle('📣 GVG Reminder Tool')
-      .setDescription('Staff/Admin can use the button below to ping members who confirmed GVG attendance.')
+      .setDescription('Staff/Admin can use the buttons below to ping confirmed attendees or manually push the live roster PNG to the roster channel.')
       .setColor(0xfa5f5f);
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('gvg_send_reminder')
         .setLabel('Send GVG Reminder')
-        .setStyle(ButtonStyle.Danger)
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('gvg_send_roster')
+        .setLabel('📊 Send Live Roster')
+        .setStyle(ButtonStyle.Primary)
     );
 
     await message.channel.send({ embeds: [embed], components: [row] });
@@ -808,6 +812,27 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {
       console.error('GVG Reminder Error:', error);
       await interaction.editReply('❌ Failed to send GVG reminder.');
+    }
+  }
+
+  // ==========================================
+  // 10. SEND LIVE ROSTER BUTTON
+  // ==========================================
+  if (interaction.isButton() && interaction.customId === 'gvg_send_roster') {
+    if (!isModOrAdminOrOwner(interaction.member, interaction.user.id)) {
+      return interaction.reply({ content: '❌ You do not have permission to do this.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      // Send roster PNGs for both Saturday and Sunday, League + Ranked
+      await generateRosterPNG(interaction.channel, 'sat', 'league');
+      await generateRosterPNG(interaction.channel, 'sun', 'league');
+      await interaction.editReply('✅ Live roster PNGs sent to the roster channel for Saturday and Sunday.');
+    } catch (error) {
+      console.error('Send Roster Error:', error);
+      await interaction.editReply('❌ Failed to generate or send roster PNGs.');
     }
   }
 });
