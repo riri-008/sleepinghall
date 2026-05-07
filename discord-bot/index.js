@@ -394,8 +394,8 @@ client.on('interactionCreate', async (interaction) => {
 
       const rsvpMsg = await eventsChannel.send({ embeds: [embed], components: [row] });
 
-      // Ping Hall Warrior and Dreamwalker roles to notify of the new event
-      await eventsChannel.send(`<@&${ROLE_MEMBER_HALLWARRIOR}> <@&${ROLE_MEMBER_DREAMWALKER}> A new guild event has been scheduled! Click **RSVP Now** above to get a ping when it starts.`);
+      // Ping Hall Warrior to notify of the new event
+      await eventsChannel.send(`<@&${ROLE_MEMBER_HALLWARRIOR}> A new guild event has been scheduled! Click **RSVP Now** above to get a ping when it starts.`);
 
       await eventRef.set({
         name,
