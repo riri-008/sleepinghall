@@ -867,7 +867,7 @@ client.on('interactionCreate', async (interaction) => {
       await rosterChannel.send(
         `🔔 **GVG SIGNUP PING**\n` +
         `<@&${ROLE_STAFF}> <@&${ROLE_COMMANDER}> <@&${ROLE_DEPUTY_COMMANDER}> <@&${ROLE_MEMBER_HALLWARRIOR}>\n\n` +
-        `Please update your attendance in the portal or via the Discord buttons! ⚔️`
+        `Please update your attendance in the **[Portal](https://sleepinghall-portal.web.app/)** or directly in <#1501291184063123496>! ⚔️`
       );
 
       await interaction.editReply('✅ Signup ping sent to the roster channel.');
