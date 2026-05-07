@@ -9,9 +9,19 @@ firebase-debug.*.log*
 
 # Firebase cache
 .firebase/
+.firebaserc
+firebase.json
+firestore.rules
+firestore.indexes.json
 
 # Firebase config
 public
+
+guild_guides.md
+guild_guides.md.resolved   
+replication-instructions.md
+replication_guide.md.resolved
+
 
 # Uncomment this if you'd like others to create their own Firebase project.
 # For a team working on the same Firebase project(s), it is recommended to leave
