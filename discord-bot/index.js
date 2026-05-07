@@ -1094,22 +1094,34 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply('❌ Your Discord account is not linked to any profile on the GVG website.');
       }
 
-      const userDoc = snapshot.docs[0];
-      const userData = userDoc.data();
+      // Identify the user and their loginUsername to handle multi-doc sync
+      const firstDoc = snapshot.docs[0];
+      const userData = firstDoc.data();
+      const username = userData.loginUsername || firstDoc.id;
 
       // Block archived users from confirming attendance
       if (userData.isArchived === true) {
         return interaction.editReply('🚫 This account has been disabled by admins. Please contact a moderator if you believe this is a mistake.');
       }
 
-      // Update with the correct field mapping
-      await userDoc.ref.update(updates);
+      // Sync update to all documents for this user
+      const userDocs = await db.collection('users').where('loginUsername', '==', username).get();
+      const batch = db.batch();
+      
+      if (userDocs.empty) {
+        // Fallback: if no loginUsername matches, just update the docs found by discordId
+        snapshot.docs.forEach(doc => batch.update(doc.ref, updates));
+      } else {
+        userDocs.forEach(doc => batch.update(doc.ref, updates));
+      }
+      await batch.commit();
 
       // ==========================================
       // 5. ROSTER AUTO-SYNC & PNG
       // ==========================================
       try {
-        await syncUserToRoster(userDoc.id, day, type, mode);
+        // Use the first doc ID for roster placement (legacy vs final doc handling is done in syncUserToRoster)
+        await syncUserToRoster(firstDoc.id, day, type, mode);
 
         // Trigger PNG update in the channel (async)
         generateRosterPNG(interaction.channel, day, type);
