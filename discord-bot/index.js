@@ -95,6 +95,14 @@ function getNextPhtTimestamp(targetDay, hour = 21, minute = 30) {
 client.once('ready', () => {
   console.log(`✅ Bot is online as ${client.user.tag}!`);
   console.log(`✅ Connected to Firebase Database!`);
+
+  client.user.setPresence({
+    status: 'idle',
+    activities: [{
+      name: 'Napping for 24 hours 💤',
+      type: 4 // ActivityType.Custom
+    }]
+  });
 });
 
 // Listen for messages (To setup the application panel and attendance panel)
