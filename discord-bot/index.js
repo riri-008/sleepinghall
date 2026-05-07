@@ -1,13 +1,13 @@
 require('dotenv').config();
-const { 
-  Client, 
-  GatewayIntentBits, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
+const {
+  Client,
+  GatewayIntentBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   EmbedBuilder,
   PermissionsBitField
 } = require('discord.js');
@@ -124,7 +124,7 @@ client.on('messageCreate', async (message) => {
     try {
       const messages = await message.channel.messages.fetch({ limit: 50 });
       const oldPanel = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === '🏆 Weekly League Attendance');
-      if (oldPanel) await oldPanel.delete().catch(() => {});
+      if (oldPanel) await oldPanel.delete().catch(() => { });
     } catch (e) { console.error("Error cleaning up old panel:", e); }
 
     const embed = new EmbedBuilder()
@@ -162,7 +162,7 @@ client.on('messageCreate', async (message) => {
     try {
       const messages = await message.channel.messages.fetch({ limit: 50 });
       const oldPanel = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === '⚔️ Weekly Ranked Attendance');
-      if (oldPanel) await oldPanel.delete().catch(() => {});
+      if (oldPanel) await oldPanel.delete().catch(() => { });
     } catch (e) { console.error("Error cleaning up old panel:", e); }
 
     const embed = new EmbedBuilder()
@@ -237,8 +237,19 @@ client.on('messageCreate', async (message) => {
     const embed = new EmbedBuilder()
       .setTitle('ℹ️ GVG Portal Info')
       .setDescription(
-        'Use the button below to confirm your portal username and receive the default password in a private reply.\n\n' +
-        'If you do not have an account yet, you can request one from the same flow.'
+        '**How to Participate in GVG**\n\n' +
+        '**1) Confirm Attendance (Discord)**\n' +
+        'Use the role buttons for **League** and **Ranked** on Saturday and Sunday.\n' +
+        'Use **None** if you are unavailable.\n\n' +
+        '**2) Use the Web Portal** (<https://sleepinghall-portal.web.app>)\n' +
+        '• Login with admin-provided credentials.\n' +
+        '• Update profile fields (class, power, innerways).\n' +
+        '• Update attendance and review live roster placements.\n\n' +
+        '**3) Portal Access Check**\n' +
+        '• Click **Confirm Portal Access** below.\n' +
+        '• You will get a private reply with your username and default password: `GVG2026!`\n' +
+        '• If you wish to reset your password, reach out to an admin.\n' +
+        '• If no account is found, click **Request Account** to notify moderators.'
       )
       .setColor(0x5865f2);
 
@@ -284,20 +295,20 @@ setInterval(async () => {
     for (const doc of snapshot.docs) {
       const event = doc.data();
       if (event.startTime.toDate() > now) continue; // Not due yet
-      
+
       const channel = await client.channels.fetch(event.channelId).catch(() => null);
       if (channel) {
         // 1. Delete the old RSVP message to keep the channel clean
         if (event.messageId) {
           const oldMsg = await channel.messages.fetch(event.messageId).catch(() => null);
-          if (oldMsg) await oldMsg.delete().catch(() => {});
+          if (oldMsg) await oldMsg.delete().catch(() => { });
         }
 
         console.log(`📢 Pinging for event: ${event.name}`);
-        const rsvpList = event.rsvps && event.rsvps.length > 0 
-          ? event.rsvps.map(id => `<@${id}>`).join(' ') 
+        const rsvpList = event.rsvps && event.rsvps.length > 0
+          ? event.rsvps.map(id => `<@${id}>`).join(' ')
           : 'No one';
-        
+
         const embed = new EmbedBuilder()
           .setTitle(`⏰ TIME FOR: ${event.name}`)
           .setDescription(`The event scheduled by <@${event.creatorId}> is starting NOW!\n\n**Participants:**\n${rsvpList}`)
@@ -305,7 +316,7 @@ setInterval(async () => {
 
         await channel.send({ content: `🔔 **ATTENTION:** ${rsvpList}`, embeds: [embed] });
       }
-      
+
       // Mark as reminded so we don't ping again
       await doc.ref.update({ reminded: true });
     }
@@ -359,7 +370,7 @@ client.on('interactionCreate', async (interaction) => {
 
       // Create the event doc FIRST so we have the ID for the button
       const eventRef = db.collection('scheduled_events').doc();
-      
+
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`rsvp_${eventRef.id}`).setLabel('RSVP Now').setEmoji('🙋‍♂️').setStyle(ButtonStyle.Success)
       );
@@ -399,9 +410,9 @@ client.on('interactionCreate', async (interaction) => {
     try {
       const docRef = db.collection('scheduled_events').doc(eventId);
       const doc = await docRef.get();
-      
+
       if (!doc.exists) return interaction.editReply('❌ Event no longer exists.');
-      
+
       const data = doc.data();
       if (data.reminded) return interaction.editReply('❌ This event has already started!');
 
@@ -627,7 +638,7 @@ client.on('interactionCreate', async (interaction) => {
         // Read application from Firestore
         const appDoc = await db.collection('pending_applications').doc(docId).get();
         if (!appDoc.exists) return interaction.editReply('❌ Application data not found in database.');
-        
+
         const data = appDoc.data();
 
         // Anti-self-approval check
@@ -663,7 +674,7 @@ client.on('interactionCreate', async (interaction) => {
         await db.collection('pending_applications').doc(docId).delete();
 
         await interaction.editReply('✅ **Application Approved!** Website account automatically created for them.');
-        
+
         // Remove buttons from the original message
         await interaction.message.edit({ components: [] });
 
@@ -703,6 +714,12 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const userData = snapshot.docs[0].data();
+
+      // Block archived users
+      if (userData.isArchived === true) {
+        return interaction.editReply('🚫 This account has been disabled by admins. Please contact a moderator if you believe this is a mistake.');
+      }
+
       const username = userData.loginUsername || userData.name || 'Unknown';
 
       await interaction.editReply(
@@ -772,7 +789,12 @@ client.on('interactionCreate', async (interaction) => {
       const sundayTs = getNextPhtTimestamp(0, 21, 30);   // Sunday 9:30 PM PHT
       const mentions = Array.from(attendeeIds).map((id) => `<@${id}>`).join(' ');
 
-      await interaction.channel.send(
+      const reminderChannel = await client.channels.fetch(ROSTER_CHANNEL_ID).catch(() => null);
+      if (!reminderChannel || !reminderChannel.isTextBased()) {
+        return interaction.editReply('❌ Reminder channel is unavailable. Please contact an admin.');
+      }
+
+      await reminderChannel.send(
         `📣 **GVG Reminder**\n${mentions}\n\n` +
         `Please be ready for GVG time:\n` +
         `• Saturday: <t:${saturdayTs}:F> (<t:${saturdayTs}:R>)\n` +
@@ -979,13 +1001,13 @@ client.on('interactionCreate', async (interaction) => {
       console.error("Defer Error:", e);
       return;
     }
-    
+
     const parts = interaction.customId.split('_');
     const type = parts[0]; // 'league' or 'ranked'
     const otherType = type === 'league' ? 'ranked' : 'league';
     const day = parts[1];  // 'sat' or 'sun'
     const mode = parts.slice(2).join('_'); // 'top_lane', 'mid_lane', etc.
-    
+
     // Field name mapping: leagueSatMode, leagueSunMode, rankedSatMode, rankedSunMode
     const fieldName = `${type}${day.charAt(0).toUpperCase() + day.slice(1)}Mode`;
     const otherFieldName = `${otherType}${day.charAt(0).toUpperCase() + day.slice(1)}Mode`;
@@ -1005,7 +1027,12 @@ client.on('interactionCreate', async (interaction) => {
 
       const userDoc = snapshot.docs[0];
       const userData = userDoc.data();
-      
+
+      // Block archived users from confirming attendance
+      if (userData.isArchived === true) {
+        return interaction.editReply('🚫 This account has been disabled by admins. Please contact a moderator if you believe this is a mistake.');
+      }
+
       // Update with the correct field mapping
       await userDoc.ref.update(updates);
 
@@ -1014,7 +1041,7 @@ client.on('interactionCreate', async (interaction) => {
       // ==========================================
       try {
         await syncUserToRoster(userDoc.id, day, type, mode);
-        
+
         // Trigger PNG update in the channel (async)
         generateRosterPNG(interaction.channel, day, type);
       } catch (e) {
@@ -1038,8 +1065,8 @@ client.on('interactionCreate', async (interaction) => {
 
       await interaction.editReply({
         content: `✅ **Attendance Updated!**\n\n` +
-                 `**League:** Sat: ${formatMode(att.leagueSatMode)} | Sun: ${formatMode(att.leagueSunMode)}\n` +
-                 `**Ranked:** Sat: ${formatMode(att.rankedSatMode)} | Sun: ${formatMode(att.rankedSunMode)}`,
+          `**League:** Sat: ${formatMode(att.leagueSatMode)} | Sun: ${formatMode(att.leagueSunMode)}\n` +
+          `**Ranked:** Sat: ${formatMode(att.rankedSatMode)} | Sun: ${formatMode(att.rankedSunMode)}`,
         ephemeral: true
       });
 
@@ -1049,8 +1076,8 @@ client.on('interactionCreate', async (interaction) => {
       const WEBHOOK_URL = process.env.ATTENDANCE_WEBHOOK_URL;
       if (WEBHOOK_URL) {
         const message = `⚔️ **${userData.name}** updated their **${type.toUpperCase()}** attendance via Discord:\n` +
-                        `> **Day:** ${day.toUpperCase()}\n` +
-                        `> **Selection:** ${formatMode(mode)}`;
+          `> **Day:** ${day.toUpperCase()}\n` +
+          `> **Selection:** ${formatMode(mode)}`;
 
         await fetch(WEBHOOK_URL, {
           method: 'POST',
