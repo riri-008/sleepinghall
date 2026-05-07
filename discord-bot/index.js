@@ -248,7 +248,7 @@ client.on('messageCreate', async (message) => {
         '**3) Portal Access Check**\n' +
         '• Click **Confirm Portal Access** below.\n' +
         '• You will get a private reply with your username and default password: `GVG2026!`\n' +
-        '• If you wish to reset your password, reach out to an admin.\n' +
+        '• You can change your password in the portal. If you wish to reset your password, reach out to an admin.\n' +
         '• If no account is found, click **Request Account** to notify moderators.'
       )
       .setColor(0x5865f2);
