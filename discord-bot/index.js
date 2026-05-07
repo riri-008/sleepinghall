@@ -40,6 +40,7 @@ const ROLE_MODERATOR = '1443207709687025684';
 const ROLE_ADMIN = '1443205952794005667';
 const ROLE_OWNER = '1443208931001237574';
 const ROSTER_CHANNEL_ID = '1501291297280098384';
+const EVENTS_CHANNEL_ID = '1501893168206188717';
 const BOT_OWNER_ID = '797429955649732639';
 const ACCOUNT_REQUEST_CHANNEL_ID = '1443215089896263680';
 const DEFAULT_PORTAL_PASSWORD = 'GVG2026!';
@@ -363,13 +364,18 @@ client.on('interactionCreate', async (interaction) => {
         new ButtonBuilder().setCustomId(`rsvp_${eventRef.id}`).setLabel('RSVP Now').setEmoji('🙋‍♂️').setStyle(ButtonStyle.Success)
       );
 
-      const rsvpMsg = await interaction.channel.send({ embeds: [embed], components: [row] });
+      const eventsChannel = await client.channels.fetch(EVENTS_CHANNEL_ID).catch(() => null);
+      if (!eventsChannel || !eventsChannel.isTextBased()) {
+        return interaction.editReply('❌ Events channel is unavailable. Please contact an admin.');
+      }
+
+      const rsvpMsg = await eventsChannel.send({ embeds: [embed], components: [row] });
 
       await eventRef.set({
         name,
         creatorId: interaction.user.id,
         startTime,
-        channelId: interaction.channelId,
+        channelId: eventsChannel.id,
         messageId: rsvpMsg.id, // Save this so we can delete it later!
         rsvps: [interaction.user.id],
         reminded: false,
