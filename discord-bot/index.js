@@ -28,6 +28,7 @@ const CATEGORY_ID = process.env.CATEGORY_ID;
 
 // ─── Server Role IDs (Sleeping Hall) ──────────────────────────────────
 // Members
+const ROLE_MEMBER_DREAMWALKER = '1443612362606379090';
 const ROLE_MEMBER_HALLWARRIOR = '1469545190090870946';
 
 // Leadership / Staff
@@ -286,7 +287,11 @@ client.on('messageCreate', async (message) => {
       new ButtonBuilder()
         .setCustomId('gvg_send_roster')
         .setLabel('📊 Send Live Roster')
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('gvg_signup_ping')
+        .setLabel('📝 Signup Ping')
+        .setStyle(ButtonStyle.Success)
     );
 
     await message.channel.send({ embeds: [embed], components: [row] });
@@ -840,6 +845,35 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {
       console.error('Send Roster Error:', error);
       await interaction.editReply('❌ Failed to generate or send roster PNGs.');
+    }
+  }
+
+  // ==========================================
+  // 11. GVG SIGNUP PING BUTTON
+  // ==========================================
+  if (interaction.isButton() && interaction.customId === 'gvg_signup_ping') {
+    if (!isModOrAdminOrOwner(interaction.member, interaction.user.id)) {
+      return interaction.reply({ content: '❌ You do not have permission to do this.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const rosterChannel = await client.channels.fetch(ROSTER_CHANNEL_ID).catch(() => null);
+      if (!rosterChannel || !rosterChannel.isTextBased()) {
+        return interaction.editReply('❌ Roster channel is unavailable.');
+      }
+
+      await rosterChannel.send(
+        `🔔 **GVG SIGNUP PING**\n` +
+        `<@&${ROLE_STAFF}> <@&${ROLE_COMMANDER}> <@&${ROLE_DEPUTY_COMMANDER}> <@&${ROLE_MEMBER_HALLWARRIOR}>\n\n` +
+        `Please update your attendance in the portal or via the Discord buttons! ⚔️`
+      );
+
+      await interaction.editReply('✅ Signup ping sent to the roster channel.');
+    } catch (error) {
+      console.error('Signup Ping Error:', error);
+      await interaction.editReply('❌ Failed to send signup ping.');
     }
   }
 });
