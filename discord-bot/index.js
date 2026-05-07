@@ -28,7 +28,6 @@ const CATEGORY_ID = process.env.CATEGORY_ID;
 
 // ─── Server Role IDs (Sleeping Hall) ──────────────────────────────────
 // Members
-const ROLE_MEMBER_DREAMWALKER = '1443612362606379090';
 const ROLE_MEMBER_HALLWARRIOR = '1469545190090870946';
 
 // Leadership / Staff
