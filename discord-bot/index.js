@@ -104,6 +104,31 @@ client.once('clientReady', () => {
       type: 4 // ActivityType.Custom
     }]
   });
+
+  // Listen to Web Portal Attendance Syncs
+  db.collection('roster_sync_queue').onSnapshot(async (snapshot) => {
+    for (const change of snapshot.docChanges()) {
+      if (change.type === 'added') {
+        const data = change.doc.data();
+        try {
+          if (data.lSat !== undefined) await syncUserToRoster(data.uid, 'sat', 'league', data.lSat);
+          if (data.lSun !== undefined) await syncUserToRoster(data.uid, 'sun', 'league', data.lSun);
+          if (data.rSat !== undefined) await syncUserToRoster(data.uid, 'sat', 'ranked', data.rSat);
+          if (data.rSun !== undefined) await syncUserToRoster(data.uid, 'sun', 'ranked', data.rSun);
+
+          const channel = await client.channels.fetch(ROSTER_CHANNEL_ID).catch(() => null);
+          if (channel) {
+            await generateRosterPNG(channel, 'sat', 'league');
+            await generateRosterPNG(channel, 'sun', 'league');
+          }
+        } catch (e) {
+          console.error("Sync queue error", e);
+        } finally {
+          await change.doc.ref.delete().catch(()=>null);
+        }
+      }
+    }
+  });
 });
 
 // Listen for messages (To setup the application panel and attendance panel)
