@@ -9,7 +9,8 @@ const {
   TextInputBuilder,
   TextInputStyle,
   EmbedBuilder,
-  PermissionsBitField
+  PermissionsBitField,
+  MessageFlags
 } = require('discord.js');
 const { db, admin } = require('./firebase'); // Import Firebase Database
 const puppeteer = require('puppeteer');
@@ -92,7 +93,7 @@ function getNextPhtTimestamp(targetDay, hour = 21, minute = 30) {
   return Math.floor(targetUtcMs / 1000);
 }
 
-client.once('ready', () => {
+client.once('clientReady', () => {
   console.log(`✅ Bot is online as ${client.user.tag}!`);
   console.log(`✅ Connected to Firebase Database!`);
 
@@ -360,7 +361,7 @@ client.on('interactionCreate', async (interaction) => {
   // 2. EVENT MODAL SUBMIT
   // ==========================================
   if (interaction.isModalSubmit() && interaction.customId === 'modal_event') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const name = interaction.fields.getTextInputValue('event_name');
     const timeInput = interaction.fields.getTextInputValue('event_time');
 
@@ -382,6 +383,7 @@ client.on('interactionCreate', async (interaction) => {
       const embed = new EmbedBuilder()
         .setTitle(`🛡️ NEW EVENT: ${name}`)
         .setDescription(`Scheduled by <@${interaction.user.id}>\n\n**Starts in:** ${timeInput}\n**Estimated Time:** <t:${Math.floor(startTime.getTime() / 1000)}:R>\n\nClick the button below to RSVP and get a ping!`)
+        .addFields({ name: `RSVPs (1/10)`, value: `<@${interaction.user.id}>` })
         .setColor(0x3498db);
 
       // Create the event doc FIRST so we have the ID for the button
@@ -424,7 +426,7 @@ client.on('interactionCreate', async (interaction) => {
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('rsvp_')) {
     const eventId = interaction.customId.split('_')[1];
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const docRef = db.collection('scheduled_events').doc(eventId);
@@ -435,15 +437,47 @@ client.on('interactionCreate', async (interaction) => {
       const data = doc.data();
       if (data.reminded) return interaction.editReply('❌ This event has already started!');
 
-      if (data.rsvps.includes(interaction.user.id)) {
+      let newRsvps = [...data.rsvps];
+      let msg = '';
+
+      if (newRsvps.includes(interaction.user.id)) {
         // Remove RSVP
-        await docRef.update({ rsvps: admin.firestore.FieldValue.arrayRemove(interaction.user.id) });
-        return interaction.editReply('💨 You have removed your RSVP.');
+        newRsvps = newRsvps.filter(id => id !== interaction.user.id);
+        msg = '💨 You have removed your RSVP.';
       } else {
         // Add RSVP
-        await docRef.update({ rsvps: admin.firestore.FieldValue.arrayUnion(interaction.user.id) });
-        return interaction.editReply('✅ You are RSVP\'d! I will ping you when it starts.');
+        if (newRsvps.length >= 10) {
+          return interaction.editReply('❌ This event is already full (10/10).');
+        }
+        newRsvps.push(interaction.user.id);
+        msg = '✅ You are RSVP\'d! I will ping you when it starts.';
       }
+
+      await docRef.update({ rsvps: newRsvps });
+
+      const eventsChannel = await client.channels.fetch(data.channelId).catch(() => null);
+      if (eventsChannel && data.messageId) {
+        const eventMsg = await eventsChannel.messages.fetch(data.messageId).catch(() => null);
+        if (eventMsg) {
+          const receivedEmbed = eventMsg.embeds[0];
+          const updatedEmbed = EmbedBuilder.from(receivedEmbed);
+          
+          const rsvpText = newRsvps.map(id => `<@${id}>`).join('\n') || 'None';
+          
+          const rsvpFieldIndex = updatedEmbed.data.fields?.findIndex(f => f.name.startsWith('RSVPs'));
+          
+          if (rsvpFieldIndex !== undefined && rsvpFieldIndex >= 0) {
+            updatedEmbed.data.fields[rsvpFieldIndex].name = `RSVPs (${newRsvps.length}/10)`;
+            updatedEmbed.data.fields[rsvpFieldIndex].value = rsvpText;
+          } else {
+            updatedEmbed.addFields({ name: `RSVPs (${newRsvps.length}/10)`, value: rsvpText });
+          }
+          
+          await eventMsg.edit({ embeds: [updatedEmbed] });
+        }
+      }
+
+      return interaction.editReply(msg);
     } catch (err) {
       console.error(err);
       await interaction.editReply('❌ RSVP failed.');
@@ -474,7 +508,7 @@ client.on('interactionCreate', async (interaction) => {
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'admin_add_member') {
     if (!isAdminOrOwner(interaction.member, interaction.user.id)) {
-      return interaction.reply({ content: '❌ Admin permission required.', ephemeral: true });
+      return interaction.reply({ content: '❌ Admin permission required.', flags: MessageFlags.Ephemeral });
     }
 
     const modal = new ModalBuilder()
@@ -512,7 +546,7 @@ client.on('interactionCreate', async (interaction) => {
   // 2. MODAL SUBMITTED -> CREATE TICKET & DATABASE ENTRY
   // ==========================================
   if (interaction.isModalSubmit() && interaction.customId === 'apply_modal') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const answers = {
       ign: interaction.fields.getTextInputValue('ign_id'),
@@ -576,10 +610,10 @@ client.on('interactionCreate', async (interaction) => {
   // ==========================================
   if (interaction.isModalSubmit() && interaction.customId === 'admin_add_member_modal') {
     if (!isAdminOrOwner(interaction.member, interaction.user.id)) {
-      return interaction.reply({ content: '❌ Admin permission required.', ephemeral: true });
+      return interaction.reply({ content: '❌ Admin permission required.', flags: MessageFlags.Ephemeral });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const username = interaction.fields.getTextInputValue('new_member_username').trim();
@@ -644,7 +678,7 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton() && (interaction.customId.startsWith('approve_') || interaction.customId.startsWith('deny_'))) {
     // Only allow staff
     if (!isStaffAdminOrOwner(interaction.member, interaction.user.id)) {
-      return interaction.reply({ content: '❌ You do not have permission to do this.', ephemeral: true });
+      return interaction.reply({ content: '❌ You do not have permission to do this.', flags: MessageFlags.Ephemeral });
     }
 
     const action = interaction.customId.split('_')[0]; // 'approve' or 'deny'
@@ -713,7 +747,7 @@ client.on('interactionCreate', async (interaction) => {
   // 7. MEMBER PORTAL INFO BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'portal_info_confirm') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const snapshot = await db.collection('users').where('discordId', '==', interaction.user.id.toString()).limit(1).get();
@@ -757,7 +791,7 @@ client.on('interactionCreate', async (interaction) => {
   // 8. MEMBER ACCOUNT REQUEST BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'portal_request_account') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const reqChannel = await client.channels.fetch(ACCOUNT_REQUEST_CHANNEL_ID).catch(() => null);
@@ -781,10 +815,10 @@ client.on('interactionCreate', async (interaction) => {
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'gvg_send_reminder') {
     if (!isModOrAdminOrOwner(interaction.member, interaction.user.id)) {
-      return interaction.reply({ content: '❌ You do not have permission to do this.', ephemeral: true });
+      return interaction.reply({ content: '❌ You do not have permission to do this.', flags: MessageFlags.Ephemeral });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const usersSnap = await db.collection('users').get();
@@ -832,10 +866,10 @@ client.on('interactionCreate', async (interaction) => {
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'gvg_send_roster') {
     if (!isModOrAdminOrOwner(interaction.member, interaction.user.id)) {
-      return interaction.reply({ content: '❌ You do not have permission to do this.', ephemeral: true });
+      return interaction.reply({ content: '❌ You do not have permission to do this.', flags: MessageFlags.Ephemeral });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       // Send roster PNGs for both Saturday and Sunday, League + Ranked
@@ -853,10 +887,10 @@ client.on('interactionCreate', async (interaction) => {
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'gvg_signup_ping') {
     if (!isModOrAdminOrOwner(interaction.member, interaction.user.id)) {
-      return interaction.reply({ content: '❌ You do not have permission to do this.', ephemeral: true });
+      return interaction.reply({ content: '❌ You do not have permission to do this.', flags: MessageFlags.Ephemeral });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const rosterChannel = await client.channels.fetch(ROSTER_CHANNEL_ID).catch(() => null);
@@ -994,7 +1028,7 @@ async function generateRosterPNG(channel, day, type) {
       <html>
       <head>
         <style>
-          body { font-family: 'Arial', sans-serif; background: #fff; margin: 0; padding: 20px; display: flex; justify-content: center; }
+          body { font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', 'Arial', sans-serif; background: #fff; margin: 0; padding: 20px; display: flex; justify-content: center; }
           .print-area { background: #fff; color: #000; padding: 30px; width: 680px; text-align: center; }
           .print-area h1 { font-size: 28px; font-weight: 800; text-decoration: underline; margin-bottom: 24px; text-transform: uppercase; }
           .category-section { margin-bottom: 50px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
@@ -1065,7 +1099,7 @@ async function generateRosterPNG(channel, day, type) {
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton() && (interaction.customId.startsWith('league_') || interaction.customId.startsWith('ranked_'))) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     } catch (e) {
       console.error("Defer Error:", e);
       return;
@@ -1130,7 +1164,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       // Fetch latest data for confirmation
-      const updatedDoc = await userDoc.ref.get();
+      const updatedDoc = await firstDoc.ref.get();
       const updatedData = updatedDoc.data();
       const att = updatedData.attendance || {};
 
@@ -1148,7 +1182,7 @@ client.on('interactionCreate', async (interaction) => {
         content: `✅ **Attendance Updated!**\n\n` +
           `**League:** Sat: ${formatMode(att.leagueSatMode)} | Sun: ${formatMode(att.leagueSunMode)}\n` +
           `**Ranked:** Sat: ${formatMode(att.rankedSatMode)} | Sun: ${formatMode(att.rankedSunMode)}`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
 
       // ==========================================
